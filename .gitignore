@@ -1,0 +1,15 @@
+# build output and IDE state
+build/
+.vs/
+**/.vs/
+
+# VirtualDJ SDK headers: third-party, download them (see README)
+SDK/*.h
+
+# audio, recordings and analysis output
+*.wav
+*.flac
+*.mp3
+*.png
+*.csv
+comparison_*.txt

@@ -1,0 +1,1 @@
+Put vdjPlugin8.h and vdjDsp8.h from the official VirtualDJ SDK here.
