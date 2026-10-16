@@ -1,0 +1,113 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # to create releases on v* tags
+
+env:
+  VDJ_SDK_URL: https://virtualdj.com/developers/VirtualDJ8_SDK_20211003.zip
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get the VirtualDJ SDK headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 -o sdk.zip "$VDJ_SDK_URL" || { echo "::error::Could not download the VirtualDJ SDK from $VDJ_SDK_URL"; exit 1; }
+          unzip -q sdk.zip -d sdk_unzipped
+          for h in vdjPlugin8.h vdjDsp8.h; do
+            f=$(find sdk_unzipped -name "$h" | head -n 1)
+            [ -n "$f" ] || { echo "::error::$h not found in the SDK zip"; exit 1; }
+            cp "$f" SDK/
+          done
+          ls -l SDK
+
+      - name: Configure
+        run: cmake -S . -B build -A x64
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp build/Release/BarberPole.dll dist/
+          7z a -tzip BarberPole-windows-x64.zip ./dist/BarberPole.dll
+          7z a -tzip BarberPole-tools-windows-x64.zip ./build/Release/knob_sequencer.exe ./build/Release/compare_recordings.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: |
+            BarberPole-windows-x64.zip
+            BarberPole-tools-windows-x64.zip
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get the VirtualDJ SDK headers
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 -o sdk.zip "$VDJ_SDK_URL" || { echo "::error::Could not download the VirtualDJ SDK from $VDJ_SDK_URL"; exit 1; }
+          unzip -q sdk.zip -d sdk_unzipped
+          for h in vdjPlugin8.h vdjDsp8.h; do
+            f=$(find sdk_unzipped -name "$h" | head -n 1)
+            [ -n "$f" ] || { echo "::error::$h not found in the SDK zip"; exit 1; }
+            cp "$f" SDK/
+          done
+
+      - name: Configure (universal: Apple Silicon + Intel)
+        run: cmake -S . -B build -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          b=$(find build -name 'BarberPole.bundle' -maxdepth 3 | head -n 1)
+          [ -n "$b" ] || { echo "::error::BarberPole.bundle not built"; exit 1; }
+          codesign --force --deep --sign - "$b"   # ad-hoc signature so macOS will load it
+          lipo -info "$b/Contents/MacOS/BarberPole"
+          ditto -c -k --keepParent "$b" BarberPole-macos-universal.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: BarberPole-macos-universal.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" artifacts/*.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Barber Pole $GITHUB_REF_NAME" \
+            --notes "Traktor-style Barber Pole Color FX for VirtualDJ.
+
+          - **Windows:** unzip BarberPole-windows-x64.zip and copy BarberPole.dll to Documents\\VirtualDJ\\Plugins64\\SoundEffect\\ (close VirtualDJ first).
+          - **Mac:** unzip BarberPole-macos-universal.zip and copy BarberPole.bundle to Documents/VirtualDJ/PluginsArm/SoundEffect/ (Apple Silicon) or Documents/VirtualDJ/Plugins64/SoundEffect/ (Intel).
+          - BarberPole-tools-windows-x64.zip has knob_sequencer.exe and compare_recordings.exe for the Traktor comparison test (see the README)."
