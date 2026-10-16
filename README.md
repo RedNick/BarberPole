@@ -2,7 +2,8 @@
 
 This is a "dual-pole" filter effect, like Traktor's Barber Pole Mixer FX. This was 100% coded by Claude.
 
-[Releases page](https://github.com/RedNick/BarberPole/releases) (Windows 64-bit and 32-bit DLLs and a universal Mac bundle, built by GitHub Actions) and skip to section 3. Building it yourself is below. Mac version is completely untested. Buy me a Mac if you want it tested :P
+### [Releases page](https://github.com/RedNick/BarberPole/releases) 
+(Windows 64-bit and 32-bit DLLs and a universal Mac bundle, built by GitHub Actions) For install skip to section 3. Mac version is completely untested. Buy me a Mac if you want it tested! (The 32 bit Windows version hasn't been tested either, but there hasn't been a 32-bit release of VirtualDJ in years. It's only built for completeness.)
 
 | Knob position | What you hear |
 |---|---|
