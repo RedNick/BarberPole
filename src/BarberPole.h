@@ -1,4 +1,4 @@
-// Barber Pole - Traktor-style dual-pole filter + endless Shepard sweep, Color FX for VirtualDJ 8+
+// Barber Pole: VirtualDJ 8+ Color FX plugin class (see BarberPole.cpp and barberpole_dsp.h).
 #ifndef BARBERPOLE_PLUGIN_H
 #define BARBERPOLE_PLUGIN_H
 
@@ -19,21 +19,22 @@ public:
     HRESULT VDJ_API OnGetParameterString(int id, char *out, int outSize) override;
     HRESULT VDJ_API OnStart() override;
     HRESULT VDJ_API OnStop() override;
-    HRESULT VDJ_API OnProcessSamples(float *buffer, int nb) override;
+    HRESULT VDJ_API OnProcessSamples(float *buffer, int frameCount) override;
 
 private:
-    // The Color parameter is declared as VDJPARAM_COLORFX: VirtualDJ's Color FX knob
-    // drives it (0.5 = knob at 12 o'clock = off).
+    // Parameter IDs. VirtualDJ stores settings and controller mappings by these numbers,
+    // so they must never change.
     enum { ID_COLOR = 0, ID_SPEED, ID_RESONANCE };
 
-    float m_Color = 0.5f;
-    float m_Speed = 0.5f;       // 0..1 -> 8, 4, 2, 1, 1/2 beats per octave
+    // Parameter values, written by VirtualDJ (all 0..1).
+    float m_Color = 0.5f;       // Color FX knob: 0.5 = 12 o'clock = off
+    float m_Speed = 0.5f;       // sweep speed: 0..1 -> 4x slower .. 4x faster than default
     float m_Resonance = 0.4f;   // notch sharpness
 
-    double beatsPerSecond() const;
+    double beatsPerSecond() const;   // track tempo, or 0 if unknown
 
-    barberpole::BarberPole m_Dsp;
-    int m_PreparedRate = 0;
+    barberpole::BarberPole m_Effect;
+    int m_PreparedSampleRate = 0;    // sample rate m_Effect was last prepared for
 };
 
 #endif

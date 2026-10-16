@@ -1,42 +1,93 @@
-// Loads the built plugin like VirtualDJ does (dlopen + DllGetClassObject), declares
-// parameters through a fake host, and runs audio through it.
+// host_sim: loads the built plugin the way VirtualDJ does (dlopen + DllGetClassObject),
+// declares its parameters through a fake host, checks the parameter texts, and runs noise
+// through it checking for NaNs.
+//
+// Usage: host_sim <path to the built plugin>
+// Build with -DREAL_SDK against the real VirtualDJ SDK headers (the fake host then also
+// implements the callbacks only the real SDK declares).
 #include "vdjDsp8.h"
 #include <dlfcn.h>
 #include <cstdio>
 #include <cmath>
 #include <vector>
-struct Host : IVdjCallbacks8 {
-  std::vector<float*> params;
+
+// Minimal stand-in for VirtualDJ: remembers where each declared parameter lives so the test
+// can set it, the way the host does when you turn a knob.
+struct FakeHost : IVdjCallbacks8 {
+  std::vector<float*> params;   // in declaration order: Color, Speed, Resonance
 #ifdef REAL_SDK
   HRESULT SendCommand(const char *) override { return S_OK; }
-  HRESULT GetInfo(const char *, double *r) override { *r = 0; return S_OK; }
+  HRESULT GetInfo(const char *, double *result) override { *result = 0; return S_OK; }
   HRESULT GetStringInfo(const char *, void *, int) override { return S_OK; }
   HRESULT GetSongBuffer(int, int, short **) override { return E_NOTIMPL; }
 #endif
-  HRESULT DeclareParameter(void *p, int type, int id, const char *n, const char *, float d) override {
-    printf("  param %d '%s' type %d default %.2f\n", id, n, type, d); *(float*)p = d; params.push_back((float*)p); return S_OK; }
-};
-int main(int argc, char **argv) {
-  void *h = dlopen(argv[1], RTLD_NOW); if (!h) { printf("dlopen: %s\n", dlerror()); return 1; }
-  auto get = (HRESULT(*)(const GUID&, const GUID&, void**))dlsym(h, "DllGetClassObject");
-  if (!get) { printf("DllGetClassObject not exported\n"); return 1; }
-  void *obj = nullptr;
-  if (get(CLSID_VdjPlugin8, IID_IVdjPluginDsp8, &obj) != NO_ERROR || !obj) { printf("refused DSP IID\n"); return 1; }
-  void *bad = nullptr; GUID wrong = IID_IVdjPluginDsp8; wrong.Data1 ^= 1;
-  if (get(CLSID_VdjPlugin8, wrong, &bad) != CLASS_E_CLASSNOTAVAILABLE) { printf("accepted wrong IID\n"); return 1; }
-  auto *p = (IVdjPluginDsp8*)obj; Host host; p->cb = &host; p->SampleRate = 48000; p->SongBpm = 48000 * 60 / 126;
-  p->OnLoad(); TVdjPluginInfo8 info{}; p->OnGetPluginInfo(&info); printf("  name '%s' v%s\n", info.PluginName, info.Version);
-  p->OnStart();
-  char s[64]; float vals[] = {0.5f, 0.51f, 0.6f, 1.0f, 0.3f, 0.0f};
-  for (float v : vals) { *host.params[0] = v; p->OnParameter(0); p->OnGetParameterString(0, s, 64); printf("  color %.2f -> %s\n", v, s); }
-  p->OnGetParameterString(1, s, 64); printf("  speed -> %s\n", s);
-  p->OnGetParameterString(2, s, 64); printf("  resonance -> %s\n", s);
-  *host.params[0] = 0.85f; std::vector<float> buf(2*512); double peak = 0, rmsIn = 0, rmsOut = 0; unsigned seed = 1;
-  for (int b = 0; b < 400; ++b) {
-    for (auto &x : buf) { seed = seed*1664525u+1013904223u; x = ((seed>>9)/8388608.0f - 1.0f)*0.3f; rmsIn += x*x; }
-    p->OnProcessSamples(buf.data(), 512);
-    for (auto x : buf) { if (!std::isfinite(x)) { printf("NaN!\n"); return 1; } peak = std::fmax(peak, std::fabs(x)); rmsOut += x*x; }
+  HRESULT DeclareParameter(void *param, int type, int id, const char *name, const char *, float defaultValue) override {
+    printf("  param %d '%s' type %d default %.2f\n", id, name, type, defaultValue);
+    *(float*)param = defaultValue;
+    params.push_back((float*)param);
+    return S_OK;
   }
-  printf("  processed 400 blocks: peak %.3f, level change %+.2f dB\n", peak, 10*std::log10(rmsOut/rmsIn));
-  p->OnStop(); p->Release(); dlclose(h); printf("HOST SIM OK\n"); return 0;
+};
+
+int main(int argc, char **argv) {
+  void *library = dlopen(argv[1], RTLD_NOW);
+  if (!library) { printf("dlopen: %s\n", dlerror()); return 1; }
+  auto getClassObject = (HRESULT(*)(const GUID&, const GUID&, void**))dlsym(library, "DllGetClassObject");
+  if (!getClassObject) { printf("DllGetClassObject not exported\n"); return 1; }
+
+  // must create the DSP plugin, and refuse any other interface
+  void *object = nullptr;
+  if (getClassObject(CLSID_VdjPlugin8, IID_IVdjPluginDsp8, &object) != NO_ERROR || !object) { printf("refused DSP IID\n"); return 1; }
+  void *unexpected = nullptr;
+  GUID wrongInterface = IID_IVdjPluginDsp8;
+  wrongInterface.Data1 ^= 1;
+  if (getClassObject(CLSID_VdjPlugin8, wrongInterface, &unexpected) != CLASS_E_CLASSNOTAVAILABLE) { printf("accepted wrong IID\n"); return 1; }
+
+  auto *plugin = (IVdjPluginDsp8*)object;
+  FakeHost host;
+  plugin->cb = &host;
+  plugin->SampleRate = 48000;
+  plugin->SongBpm = 48000 * 60 / 126;   // the SDK's "SongBpm" is samples per beat: 126 BPM at 48 kHz
+  plugin->OnLoad();
+  TVdjPluginInfo8 info{};
+  plugin->OnGetPluginInfo(&info);
+  printf("  name '%s' v%s\n", info.PluginName, info.Version);
+  plugin->OnStart();
+
+  // parameter texts for a few knob positions
+  char text[64];
+  float colorValues[] = {0.5f, 0.51f, 0.6f, 1.0f, 0.3f, 0.0f};
+  for (float color : colorValues) {
+    *host.params[0] = color;
+    plugin->OnParameter(0);
+    plugin->OnGetParameterString(0, text, 64);
+    printf("  color %.2f -> %s\n", color, text);
+  }
+  plugin->OnGetParameterString(1, text, 64); printf("  speed -> %s\n", text);
+  plugin->OnGetParameterString(2, text, 64); printf("  resonance -> %s\n", text);
+
+  // 400 blocks of white noise with the knob well to the right
+  *host.params[0] = 0.85f;
+  std::vector<float> buffer(2*512);
+  double peak = 0, energyIn = 0, energyOut = 0;
+  unsigned seed = 1;
+  for (int block = 0; block < 400; ++block) {
+    for (auto &sample : buffer) {
+      seed = seed*1664525u+1013904223u;   // small LCG: same noise on every platform
+      sample = ((seed>>9)/8388608.0f - 1.0f)*0.3f;
+      energyIn += sample*sample;
+    }
+    plugin->OnProcessSamples(buffer.data(), 512);
+    for (auto sample : buffer) {
+      if (!std::isfinite(sample)) { printf("NaN!\n"); return 1; }
+      peak = std::fmax(peak, std::fabs(sample));
+      energyOut += sample*sample;
+    }
+  }
+  printf("  processed 400 blocks: peak %.3f, level change %+.2f dB\n", peak, 10*std::log10(energyOut/energyIn));
+  plugin->OnStop();
+  plugin->Release();
+  dlclose(library);
+  printf("HOST SIM OK\n");
+  return 0;
 }
