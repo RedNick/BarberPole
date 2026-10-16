@@ -2,6 +2,8 @@
 
 This is a "dual-pole" filter effect, like Traktor's Barber Pole Mixer FX. This was 100% coded by Claude.
 
+[Releases page](https://github.com/RedNick/BarberPole/releases) (Windows DLL and a universal Mac bundle, built by GitHub Actions) and skip to section 3. Building it yourself is below. Mac version is completely untested. Buy me a Mac if you want it tested :P
+
 | Knob position | What you hear |
 |---|---|
 | **12 o'clock** | Nothing. The output is bit-identical to the input, with a ±3 % dead zone so a jittery knob stays off. |
@@ -18,9 +20,8 @@ The extra parameters appear in the effect's own panel:
 | **Speed** | 2.8 beats per octave up, 1.8 down | Synced to the track's BPM. Like Traktor's, it climbs a little slower than it falls. The slider scales both by 4× slower to 4× faster. |
 | **Resonance** | 40 % | Sets notch sharpness, from soft and wide to narrow and vocal. |
 
-How it works: there are 8 notches spaced one octave apart, all gliding together like a phaser, in two identical stages for extra depth, with a gentle resonant peak half way between each pair (like Traktor's, so the sweep is deep without scooping out the mids). Each notch and peak fades in at the bottom of the range and out at the top (the Shepard/Risset illusion), so the motion never ends and never jumps. The peaks are moderate (at most about +8 dB on a single frequency, and the overall level still drops as you turn). The DJ filter is a 24 dB/oct (4th-order Butterworth) state-variable filter with a gentle resonance bump mid-travel. It uses about 3 % of one CPU core per deck.
+How it works: there are 8 notches spaced one octave apart, all gliding together like a phaser, in two identical stages for extra depth, with a gentle resonant peak half way between each pair (like Traktor's, so the sweep is deep without scooping out the mids). Each notch and peak fades in at the bottom of the range and out at the top (the [Shepard/Risset illusion](https://en.wikipedia.org/wiki/Shepard_tone)), so the motion never ends and never jumps. The peaks are moderate (at most about +8 dB on a single frequency, and the overall level still drops as you turn). The DJ filter is a 24 dB/oct (4th-order Butterworth) state-variable filter with a gentle resonance bump mid-travel. It uses about 3 % of one CPU core per deck.
 
-**Just want the plugin?** Download it from the [Releases page](https://github.com/RedNick/BarberPole/releases) (Windows DLL and a universal Mac bundle, built by GitHub Actions) and skip to section 3. Building it yourself is below.
 
 ## 1. Get the SDK headers
 
@@ -125,3 +126,9 @@ Options: `--port <name|number>`, `--channel 1-16`, `--cc 0-127` (default 20), `-
 The code is released under the MIT License (see `LICENSE`). The VirtualDJ SDK headers it builds against are not included and are covered by VirtualDJ's own terms.
 
 This is an independent project. It isn't affiliated with, endorsed by or connected to Native Instruments or Atomix Productions. Traktor is a trademark of Native Instruments, and VirtualDJ is a trademark of Atomix Productions; they're mentioned only to describe what the effect is like and what it runs in.
+
+## Thanks
+
+Thankyou Native Instruments for Traktor having such a good effect, and Atomix for making VirtualDJ so customisable.
+
+And special thanks to [LaurieWired](https://www.youtube.com/watch?v=y-NOz94ZEOA) for alerting me to the performance issues of fading audio.
