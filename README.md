@@ -1,9 +1,9 @@
-# Barber Pole: Traktor-style Colour FX for VirtualDJ (v2.4.2)
+# Barber Pole: Traktor-style Mixer/Colour FX for VirtualDJ (v2.4.2)
 
 This is a "dual-pole" filter effect, like Traktor's Barber Pole Mixer FX. This was 100% coded by Claude.
 
 ### [Releases page](https://github.com/RedNick/BarberPole/releases) 
-(Windows 64-bit and 32-bit DLLs and a universal Mac bundle, built by GitHub Actions) For install skip to section 3. Mac version is completely untested. Buy me a Mac if you want it tested! (The 32 bit Windows version hasn't been tested either, but there hasn't been a 32-bit release of VirtualDJ in years. It's only built for completeness.)
+(Windows 64-bit and 32-bit DLLs and a universal Mac bundle, built by GitHub Actions) For install skip to section 3. Mac version is completely untested. Buy me a Mac if you want it tested! (The 32 bit Windows version hasn't been tested either, but there hasn't been a 32-bit release of VirtualDJ in years. It's only built for completeness.) See section 4 if you want to use it as colour/mixer FX
 
 | Knob position | What you hear |
 |---|---|
@@ -14,7 +14,7 @@ This is a "dual-pole" filter effect, like Traktor's Barber Pole Mixer FX. This w
 
 These ranges, speeds and the notch depth were matched to recordings of Traktor's Barber Pole (see "Comparing with Traktor" below). Like Traktor's, it never cuts to silence.
 
-The extra parameters appear in the effect's own panel:
+The extra parameters appear in the effect's own panel (only when used as non-colour/mixer FX):
 
 | Parameter | Default | |
 |---|---|---|
