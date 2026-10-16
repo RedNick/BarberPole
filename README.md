@@ -1,4 +1,4 @@
-# Barber Pole: Traktor-style Color FX for VirtualDJ (v2.4.1)
+# Barber Pole: Traktor-style Colour FX for VirtualDJ (v2.4.1)
 
 This is a "dual-pole" filter effect, like Traktor's Barber Pole Mixer FX. This was 100% coded by Claude.
 
@@ -52,15 +52,15 @@ Close VirtualDJ, then copy the DLL (it replaces the old version) into:
 - Mac (Intel): `Documents/VirtualDJ/Plugins64/SoundEffect/`
 - Mac (Apple Silicon): `Documents/VirtualDJ/PluginsArm/SoundEffect/`
 
-## 4. Use it as the Color FX
+## 4. Use it as the Colour FX
 
-The Color knob is registered with the SDK's `DeclareParameterColorFX` type, so VirtualDJ treats it as a real Color FX. Right-click the Color FX selector on the mixer and pick **Barber Pole**. If it doesn't appear there, assign it with VDJScript instead:
+The Colour knob is registered with the SDK's `DeclareParameterColourFX` type, so VirtualDJ treats it as a real Colour FX. Right-click the Colour FX selector on the mixer and pick **Barber Pole**. If it doesn't appear there, assign it with VDJScript instead:
 
 ```
-filter_selectcolorfx "Barber Pole"
+filter_selectcolourfx "Barber Pole"
 ```
 
-After that, the Filter/Color knob drives it. Don't also add the built-in filter on top: this effect *is* the filter.
+After that, the Filter/Colour knob drives it. Don't also add the built-in filter on top: this effect *is* the filter.
 
 ## Comparing with Traktor: automated knob test
 
@@ -68,7 +68,7 @@ After that, the Filter/Color knob drives it. Don't also add the built-in filter 
 
 **One-time setup**
 
-1. Install **loopMIDI** (free, by Tobias Erichsen) and create a port. The default name, "loopMIDI Port", is fine. Leave loopMIDI running.
+1. Use the new MS MIDI loopback feature (https://github.com/microsoft/MIDI) or install **loopMIDI** (free, by Tobias Erichsen) and create a port. The default name, "loopMIDI Port", is fine. Leave loopMIDI running. For the MS one, I found A and B to get mixed up, so try both.
 2. Build. The normal `cmake --build build --config Release` now also produces `build\Release\knob_sequencer.exe`.
 3. Check the port shows up:
    ```
@@ -86,7 +86,7 @@ After that, the Filter/Color knob drives it. Don't also add the built-in filter 
 
 1. Go to Settings → Controllers. The loopMIDI port appears as a MIDI device.
 2. Click **Learn**, run `knob_sequencer.exe learn`, and give it the action `deck 1 filter`.
-3. Select **Barber Pole** as deck 1's Color FX (see section 4).
+3. Select **Barber Pole** as deck 1's Colour FX (see section 4).
 4. VirtualDJ and Traktor shouldn't be listening to the same port at the same time. Close one before testing the other, or make a second loopMIDI port and use `--port`.
 
 **Run the test** (once per program)
