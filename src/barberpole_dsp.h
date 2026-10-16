@@ -19,6 +19,10 @@
 #define BARBERPOLE_DSP_H
 
 #include <cmath>
+#if defined(_M_X64) || defined(_M_IX86) || defined(__x86_64__) || defined(__i386__)
+#include <xmmintrin.h>
+#define BARBERPOLE_X86 1
+#endif
 
 namespace barberpole {
 
@@ -29,6 +33,11 @@ constexpr double kPi = 3.14159265358979323846;
 struct Svf {
     double ic1 = 0.0, ic2 = 0.0;
     void reset() { ic1 = ic2 = 0.0; }
+    // values this small are inaudible; clearing them keeps them out of the slow denormal range
+    void flush() {
+        if (std::fabs(ic1) < 1e-20) ic1 = 0.0;
+        if (std::fabs(ic2) < 1e-20) ic2 = 0.0;
+    }
     // g = tan(pi*fc/fs), k = 1/Q.  Outputs low, band, high.
     inline void process(double x, double g, double k, double &lp, double &bp, double &hp) {
         const double a1 = 1.0 / (1.0 + g * (g + k));
@@ -39,6 +48,18 @@ struct Svf {
         ic2 = 2.0 * v2 - ic2;
         lp = v2; bp = v1; hp = x - k * v1 - v2;
     }
+};
+
+// ---------------------------------------------------------------------------
+// While alive, the CPU treats denormal (extremely small) numbers as zero. On x86 they are
+// up to ~100x slower, and filter states decay into that range when the music stops.
+// ARM (Apple Silicon) handles them at full speed, so nothing is needed there.
+struct DenormalGuard {
+#ifdef BARBERPOLE_X86
+    unsigned int saved;
+    DenormalGuard() : saved(_mm_getcsr()) { _mm_setcsr(saved | 0x8040); }   // FTZ | DAZ
+    ~DenormalGuard() { _mm_setcsr(saved); }
+#endif
 };
 
 // ---------------------------------------------------------------------------
@@ -117,6 +138,7 @@ public:
             amt_ = 0.0; fmix_ = 0.0; t_ = 0.0;
             return;
         }
+        DenormalGuard noDenormals;   // restores the host's setting on return
         const double invSr = 1.0 / (double)sr_;
         const double nyqGuard = 0.45 * sr_;
         const double kRange = (double)kVoices;               // octaves covered
@@ -228,12 +250,12 @@ public:
                 buf[2 * i + ch] = (float)out;
             }
         }
-        // flush denormals in idle states
+        // clear inaudibly small filter states (silence after a track stops), so they never
+        // reach the denormal range (also on CPUs where the guard above does nothing)
         for (int ch = 0; ch < 2; ++ch) {
-            if (std::fabs(filt_[ch].ic1) < 1e-25) filt_[ch].ic1 = 0.0;
-            if (std::fabs(filt_[ch].ic2) < 1e-25) filt_[ch].ic2 = 0.0;
-            if (std::fabs(filt2_[ch].ic1) < 1e-25) filt2_[ch].ic1 = 0.0;
-            if (std::fabs(filt2_[ch].ic2) < 1e-25) filt2_[ch].ic2 = 0.0;
+            filt_[ch].flush();
+            filt2_[ch].flush();
+            for (int v = 0; v < kVoices; ++v) { voice_[ch][v].flush(); voice2_[ch][v].flush(); voice3_[ch][v].flush(); }
         }
     }
 
