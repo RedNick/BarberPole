@@ -119,3 +119,9 @@ Options: `--port <name|number>`, `--channel 1-16`, `--cc 0-127` (default 20), `-
 - `barberpole_test_126bpm.wav`: 126 BPM pink-noise test file
 - `demo_barberpole.wav`: a 126 BPM loop. It's off for 3 s, then the knob turns right slowly (build), returns to centre, then turns left (breakdown).
 - `demo_spectrogram.png`: a picture of the notches climbing and falling
+
+## License and trademarks
+
+The code is released under the MIT License (see `LICENSE`). The VirtualDJ SDK headers it builds against are not included and are covered by VirtualDJ's own terms.
+
+This is an independent project. It isn't affiliated with, endorsed by or connected to Native Instruments or Atomix Productions. Traktor is a trademark of Native Instruments, and VirtualDJ is a trademark of Atomix Productions; they're mentioned only to describe what the effect is like and what it runs in.
