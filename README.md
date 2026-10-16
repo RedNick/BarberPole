@@ -20,6 +20,8 @@ The extra parameters appear in the effect's own panel:
 
 How it works: there are 8 notches spaced one octave apart, all gliding together like a phaser, in two identical stages for extra depth, with a gentle resonant peak half way between each pair (like Traktor's, so the sweep is deep without scooping out the mids). Each notch and peak fades in at the bottom of the range and out at the top (the Shepard/Risset illusion), so the motion never ends and never jumps. The peaks are moderate (at most about +8 dB on a single frequency, and the overall level still drops as you turn). The DJ filter is a 24 dB/oct (4th-order Butterworth) state-variable filter with a gentle resonance bump mid-travel. It uses about 3 % of one CPU core per deck.
 
+**Just want the plugin?** Download it from the [Releases page](https://github.com/RedNick/BarberPole/releases) (Windows DLL and a universal Mac bundle, built by GitHub Actions) and skip to section 3. Building it yourself is below.
+
 ## 1. Get the SDK headers
 
 1. Download the official SDK: <https://virtualdj.com/developers/VirtualDJ8_SDK_20211003.zip>
