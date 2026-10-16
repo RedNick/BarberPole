@@ -69,7 +69,7 @@ jobs:
             cp "$f" SDK/
           done
 
-      - name: Configure (universal: Apple Silicon + Intel)
+      - name: "Configure (universal: Apple Silicon + Intel)"
         run: cmake -S . -B build -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
