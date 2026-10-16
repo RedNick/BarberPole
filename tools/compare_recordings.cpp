@@ -532,8 +532,49 @@ int main(int argc, char **argv) {
         if (haveSource) alignToSource(r, source.L, source.sr);
         // knob leaves the dead zone ~0.12 s into the first glide (which starts at sequence 8.0 s)
         if (offset[k] >= 0) r.seqStart = offset[k];
-        else if (found) r.seqStart = r.onset - 8.12;
-        else { std::fprintf(stderr, "%s: could not find where the knob first moves; use --offset-%c\n", files[k].c_str(), 'a' + k); return 1; }
+        else {
+            // Fit the whole sequence: right turns cut the lows, left turns cut the highs. Pick
+            // the start where the high-minus-low band balance follows the knob best. (The first
+            // knob move alone is easy to miss: right 1/4 is subtle in some effects.)
+            const double len = r.audio.L.size() / (double)r.audio.sr;
+            const double last = steps.back().end;
+            double best = -1e30, bestStart = -1;
+            std::vector<double> cand, scores;
+            for (double s0 = r.toSrc(0.0) - 5.0; s0 + last <= r.toSrc(len); s0 += 0.1) {
+                double score = 0;
+                for (size_t s = 1; s < steps.size(); ++s) {
+                    const Step &st = steps[s];
+                    if (st.label.rfind("sweep", 0) == 0 || std::fabs(st.knob - 0.5) < 0.03) continue;
+                    // 1 s clear of the glide at each end, so the best range is centred on the truth
+                    const double t0 = r.toRec(s0 + st.start + 1.5), t1 = r.toRec(s0 + st.end - 1.0);
+                    if (t0 < 0) { score = -1e30; break; }
+                    const std::vector<double> m = meanBands(r.fr, r.fr.index(t0), r.fr.index(t1));
+                    double lo = 0, hi = 0;
+                    for (int b = 0; b < 4; ++b) lo += m[b];                  // 31 .. 63 Hz
+                    for (int b = kBands - 6; b < kBands; ++b) hi += m[b];    // 8 .. 16 kHz
+                    score += (st.knob > 0.5 ? 1.0 : -1.0) * (db(hi) - db(lo));
+                }
+                cand.push_back(s0);
+                scores.push_back(score);
+                if (score > best) { best = score; bestStart = s0; }
+            }
+            // middle of the plateau of near-best scores around the best one
+            if (best > -1e20) {
+                size_t bi = 0;
+                while (cand[bi] != bestStart) ++bi;
+                const double tol = 0.03 * std::fabs(best);
+                size_t lo = bi, hi = bi;
+                while (lo > 0 && scores[lo - 1] >= best - tol) --lo;
+                while (hi + 1 < scores.size() && scores[hi + 1] >= best - tol) ++hi;
+                bestStart = 0.5 * (cand[lo] + cand[hi]);
+            }
+            if (bestStart < -1e20 || best < -1e20) {
+                if (!found) { std::fprintf(stderr, "%s: could not line up the knob sequence; use --offset-%c\n", files[k].c_str(), 'a' + k); return 1; }
+                r.seqStart = r.onset - 8.12;
+            } else {
+                r.seqStart = r.toRec(bestStart);
+            }
+        }
         r.seqSrc = r.toSrc(r.seqStart);
         // The sequence opens with 8 s at centre, which is untouched by definition: use that as
         // the reference (the audio before it may still have the knob off-centre from earlier).
