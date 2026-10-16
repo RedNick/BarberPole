@@ -54,10 +54,10 @@ Close VirtualDJ, then copy the DLL (it replaces the old version) into:
 
 ## 4. Use it as the Colour FX
 
-The Colour knob is registered with the SDK's `DeclareParameterColourFX` type, so VirtualDJ treats it as a real Colour FX. Right-click the Colour FX selector on the mixer and pick **Barber Pole**. If it doesn't appear there, assign it with VDJScript instead:
+The Colour knob is registered with the SDK's `DeclareParameterColorFX` type, so VirtualDJ treats it as a real Colour FX. Right-click the Colour FX selector on the mixer and pick **Barber Pole**. If it doesn't appear there, assign it with VDJScript instead:
 
 ```
-filter_selectcolourfx "Barber Pole"
+filter_selectcolorfx "Barber Pole"
 ```
 
 After that, the Filter/Colour knob drives it. Don't also add the built-in filter on top: this effect *is* the filter.
