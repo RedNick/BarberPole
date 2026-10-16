@@ -535,6 +535,13 @@ int main(int argc, char **argv) {
         else if (found) r.seqStart = r.onset - 8.12;
         else { std::fprintf(stderr, "%s: could not find where the knob first moves; use --offset-%c\n", files[k].c_str(), 'a' + k); return 1; }
         r.seqSrc = r.toSrc(r.seqStart);
+        // The sequence opens with 8 s at centre, which is untouched by definition: use that as
+        // the reference (the audio before it may still have the knob off-centre from earlier).
+        if (r.at(0.5) >= 0) {
+            r.refI0 = r.fr.index(r.at(0.5));
+            r.refI1 = r.fr.index(r.at(7.5));
+            r.ref = meanBands(r.fr, r.refI0, r.refI1);
+        }
         if (offset[k] < 0 && r.seqStart < r.playStart)
             std::fprintf(stderr, "Warning: %s: the knob moved less than 8 s after playback started; the untouched reference may be short\n", files[k].c_str());
         double ops, conf, var;
