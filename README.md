@@ -1,4 +1,4 @@
-# Barber Pole: Traktor-style Color FX for VirtualDJ (v2.3)
+# Barber Pole: Traktor-style Color FX for VirtualDJ (v2.4)
 
 This is a "dual-pole" filter effect, like Traktor's Barber Pole Mixer FX.
 
@@ -7,7 +7,7 @@ This is a "dual-pole" filter effect, like Traktor's Barber Pole Mixer FX.
 | **12 o'clock** | Nothing. The output is bit-identical to the input, with a ±3 % dead zone so a jittery knob stays off. |
 | **Right** | A high-pass filter rises while notches climb forever. At full right the high-pass sits at about 640 Hz, so the mids and highs keep sweeping. Good for build-ups. |
 | **Left** | A low-pass filter falls while notches fall forever. At full left the low-pass sits at about 900 Hz. Good for breakdowns. |
-| Further from centre | The cutoff moves further (28 Hz → 640 Hz on the right, 12 kHz → 900 Hz on the left) and the notches fade in over the first 40 % of the turn. The sweep speed stays the same. |
+| Further from centre | The cutoff moves further (28 Hz → 640 Hz on the right, 12 kHz → 900 Hz on the left) the sweep fades in over the first third of the turn, and the level drops a little more (about −5 dB at full right, −3.5 dB at full left). The sweep speed stays the same. |
 
 These ranges, speeds and the notch depth were matched to recordings of Traktor's Barber Pole (see "Comparing with Traktor" below). Like Traktor's, it never cuts to silence.
 
@@ -18,7 +18,7 @@ The extra parameters appear in the effect's own panel:
 | **Speed** | 2.8 beats per octave up, 1.8 down | Synced to the track's BPM. Like Traktor's, it climbs a little slower than it falls. The slider scales both by 4× slower to 4× faster. |
 | **Resonance** | 40 % | Sets notch sharpness, from soft and wide to narrow and vocal. |
 
-How it works: there are 8 notches spaced one octave apart, all gliding together like a phaser, in two identical stages for extra depth. Each notch fades in at the bottom of the range and out at the top (the Shepard/Risset illusion), so the motion never ends and never jumps. Because they're notches rather than resonant peaks, sustained notes are never boosted harshly. The DJ filter is a 24 dB/oct (4th-order Butterworth) state-variable filter with a gentle resonance bump mid-travel. It uses about 2 % of one CPU core per deck.
+How it works: there are 8 notches spaced one octave apart, all gliding together like a phaser, in two identical stages for extra depth, with a gentle resonant peak half way between each pair (like Traktor's, so the sweep is deep without scooping out the mids). Each notch and peak fades in at the bottom of the range and out at the top (the Shepard/Risset illusion), so the motion never ends and never jumps. The peaks are moderate (at most about +8 dB on a single frequency, and the overall level still drops as you turn). The DJ filter is a 24 dB/oct (4th-order Butterworth) state-variable filter with a gentle resonance bump mid-travel. It uses about 3 % of one CPU core per deck.
 
 ## 1. Get the SDK headers
 
