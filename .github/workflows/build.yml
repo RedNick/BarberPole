@@ -32,25 +32,44 @@ jobs:
           done
           ls -l SDK
 
-      - name: Configure
+      - name: Configure (64-bit)
         run: cmake -S . -B build -A x64
 
-      - name: Build
+      - name: Build (64-bit)
         run: cmake --build build --config Release
 
+      - name: Configure (32-bit)
+        run: cmake -S . -B build32 -A Win32
+
+      - name: Build (32-bit plugin only)
+        run: cmake --build build32 --config Release --target BarberPole
+
+      - name: Check the exports
+        shell: pwsh
+        run: |
+          # VirtualDJ looks up the undecorated name; 32-bit __stdcall would otherwise decorate it
+          $dumpbin = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -find "VC\Tools\MSVC\**\bin\Hostx64\x64\dumpbin.exe" | Select-Object -First 1
+          foreach ($dll in "build\Release\BarberPole.dll", "build32\Release\BarberPole.dll") {
+            $exports = & $dumpbin /nologo /exports $dll
+            if (-not ($exports -match '\sDllGetClassObject$')) { Write-Output "::error::$dll does not export DllGetClassObject"; $exports | Select-String DllGet; exit 1 }
+            Write-Output "$dll exports DllGetClassObject"
+          }
       - name: Package
         shell: bash
         run: |
-          mkdir -p dist
+          mkdir -p dist dist32
           cp build/Release/BarberPole.dll dist/
+          cp build32/Release/BarberPole.dll dist32/
           7z a -tzip BarberPole-windows-x64.zip ./dist/BarberPole.dll
+          7z a -tzip BarberPole-windows-x86.zip ./dist32/BarberPole.dll
           7z a -tzip BarberPole-tools-windows-x64.zip ./build/Release/knob_sequencer.exe ./build/Release/compare_recordings.exe
 
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-x64
+          name: windows
           path: |
             BarberPole-windows-x64.zip
+            BarberPole-windows-x86.zip
             BarberPole-tools-windows-x64.zip
 
   macos:
@@ -109,5 +128,6 @@ jobs:
             --notes "Traktor-style Barber Pole Color FX for VirtualDJ.
 
           - **Windows:** unzip BarberPole-windows-x64.zip and copy BarberPole.dll to Documents\\VirtualDJ\\Plugins64\\SoundEffect\\ (close VirtualDJ first).
+          - **Windows, 32-bit VirtualDJ only:** use BarberPole-windows-x86.zip instead, and copy BarberPole.dll to Documents\\VirtualDJ\\Plugins\\SoundEffect\\.
           - **Mac:** unzip BarberPole-macos-universal.zip and copy BarberPole.bundle to Documents/VirtualDJ/PluginsArm/SoundEffect/ (Apple Silicon) or Documents/VirtualDJ/Plugins64/SoundEffect/ (Intel).
           - BarberPole-tools-windows-x64.zip has knob_sequencer.exe and compare_recordings.exe for the Traktor comparison test (see the README)."

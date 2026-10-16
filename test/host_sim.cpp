@@ -32,7 +32,9 @@ struct FakeHost : IVdjCallbacks8 {
 int main(int argc, char **argv) {
   void *library = dlopen(argv[1], RTLD_NOW);
   if (!library) { printf("dlopen: %s\n", dlerror()); return 1; }
-  auto getClassObject = (HRESULT(*)(const GUID&, const GUID&, void**))dlsym(library, "DllGetClassObject");
+  // VDJ_API is the plugin's calling convention (__stdcall on 32-bit Windows); a plain function
+  // pointer would be __cdecl there and corrupt the stack on every call
+  auto getClassObject = (HRESULT (VDJ_API *)(const GUID&, const GUID&, void**))dlsym(library, "DllGetClassObject");
   if (!getClassObject) { printf("DllGetClassObject not exported\n"); return 1; }
 
   // must create the DSP plugin, and refuse any other interface

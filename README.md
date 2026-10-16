@@ -1,8 +1,8 @@
-# Barber Pole: Traktor-style Colour FX for VirtualDJ (v2.4.1)
+# Barber Pole: Traktor-style Colour FX for VirtualDJ (v2.4.2)
 
 This is a "dual-pole" filter effect, like Traktor's Barber Pole Mixer FX. This was 100% coded by Claude.
 
-[Releases page](https://github.com/RedNick/BarberPole/releases) (Windows DLL and a universal Mac bundle, built by GitHub Actions) and skip to section 3. Building it yourself is below. Mac version is completely untested. Buy me a Mac if you want it tested :P
+[Releases page](https://github.com/RedNick/BarberPole/releases) (Windows 64-bit and 32-bit DLLs and a universal Mac bundle, built by GitHub Actions) and skip to section 3. Building it yourself is below. Mac version is completely untested. Buy me a Mac if you want it tested :P
 
 | Knob position | What you hear |
 |---|---|
@@ -22,7 +22,6 @@ The extra parameters appear in the effect's own panel:
 
 How it works: there are 8 notches spaced one octave apart, all gliding together like a phaser, in two identical stages for extra depth, with a gentle resonant peak half way between each pair (like Traktor's, so the sweep is deep without scooping out the mids). Each notch and peak fades in at the bottom of the range and out at the top (the [Shepard/Risset illusion](https://en.wikipedia.org/wiki/Shepard_tone)), so the motion never ends and never jumps. The peaks are moderate (at most about +8 dB on a single frequency, and the overall level still drops as you turn). The DJ filter is a 24 dB/oct (4th-order Butterworth) state-variable filter with a gentle resonance bump mid-travel. It uses about 3 % of one CPU core per deck.
 
-
 ## 1. Get the SDK headers
 
 1. Download the official SDK: <https://virtualdj.com/developers/VirtualDJ8_SDK_20211003.zip>
@@ -37,7 +36,7 @@ How it works: there are 8 notches spaced one octave apart, all gliding together 
 cmake -S . -B build -A x64
 cmake --build build --config Release
 ```
-This produces `build\Release\BarberPole.dll`.
+This produces `build\Release\BarberPole.dll`. For 32-bit VirtualDJ, build with `-A Win32` into a separate folder instead (e.g. `cmake -S . -B build32 -A Win32`).
 
 **macOS**:
 ```
@@ -49,7 +48,8 @@ cmake --build build
 
 Close VirtualDJ, then copy the DLL (it replaces the old version) into:
 
-- Windows: `Documents\VirtualDJ\Plugins64\SoundEffect\`
+- Windows (64-bit VirtualDJ, the usual one): `Documents\VirtualDJ\Plugins64\SoundEffect\`
+- Windows (32-bit VirtualDJ only): the 32-bit DLL goes in `Documents\VirtualDJ\Plugins\SoundEffect\`
 - Mac (Intel): `Documents/VirtualDJ/Plugins64/SoundEffect/`
 - Mac (Apple Silicon): `Documents/VirtualDJ/PluginsArm/SoundEffect/`
 

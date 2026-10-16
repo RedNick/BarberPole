@@ -1,0 +1,6 @@
+; Exports the plugin entry point under its plain name. VirtualDJ looks up "DllGetClassObject";
+; without this, a 32-bit build would export the __stdcall-decorated "_DllGetClassObject@12".
+; PRIVATE keeps it out of the import library, as is usual for this COM-style entry point.
+LIBRARY BarberPole
+EXPORTS
+    DllGetClassObject PRIVATE

@@ -1,5 +1,6 @@
 # build output and IDE state
 build/
+build32/
 .vs/
 **/.vs/
 
