@@ -48,19 +48,63 @@ struct StateVariableFilter {
         if (std::fabs(lowIntegrator) < 1e-20) lowIntegrator = 0.0;
     }
 
-    // tuning = tan(pi * cutoff / sampleRate), damping = 1 / Q.
-    // The band-pass output has unity gain at the cutoff frequency.
-    inline void process(double input, double tuning, double damping,
-                        double &low, double &band, double &high) {
+    // Filter settings. tuning = tan(pi * cutoff / sampleRate), damping = 1 / Q. They are
+    // worked out once whenever the cutoff or Q changes, rather than every sample, because
+    // they need a division.
+    struct Coefficients { double tuning, damping, norm, tuningNorm; };
+    static Coefficients coefficients(double tuning, double damping) {
         const double norm = 1.0 / (1.0 + tuning * (tuning + damping));
+        return { tuning, damping, norm, tuning * norm };
+    }
+
+    // One sample in; low- and high-pass out. The band-pass (unity gain at the cutoff) is
+    // input - low - damping * high, so it isn't returned separately.
+    inline void process(double input, const Coefficients &c, double &low, double &high) {
         const double inputMinusLow = input - lowIntegrator;
-        const double bandOut = norm * bandIntegrator + tuning * norm * inputMinusLow;
-        const double lowOut = lowIntegrator + tuning * bandOut;
+        const double bandOut = c.norm * bandIntegrator + c.tuningNorm * inputMinusLow;
+        const double lowOut = lowIntegrator + c.tuning * bandOut;
         bandIntegrator = 2.0 * bandOut - bandIntegrator;
         lowIntegrator = 2.0 * lowOut - lowIntegrator;
         low = lowOut;
-        band = bandOut;
-        high = input - damping * bandOut - lowOut;
+        high = input - c.damping * bandOut - lowOut;
+    }
+};
+
+// ---------------------------------------------------------------------------
+// N state-variable band-passes stored side by side (structure of arrays), so the compiler
+// can update several at once with SIMD. Same maths and rounding as StateVariableFilter.
+template <int N>
+struct BandPassBank {
+    double bandIntegrator[N] = {}, lowIntegrator[N] = {};
+    double norm[N] = {}, tuningNorm[N] = {}, tuning[N] = {}, weight[N] = {};
+
+    void reset(int n) { bandIntegrator[n] = lowIntegrator[n] = 0.0; }
+    void resetAll() { for (int n = 0; n < N; ++n) reset(n); }
+    void flush() {
+        for (int n = 0; n < N; ++n) {
+            if (std::fabs(bandIntegrator[n]) < 1e-20) bandIntegrator[n] = 0.0;
+            if (std::fabs(lowIntegrator[n]) < 1e-20) lowIntegrator[n] = 0.0;
+        }
+    }
+    // weight scales this filter's band-pass output (the notch/peak fade window)
+    void setCoefficients(int n, double tuningIn, double damping, double weightIn) {
+        const auto c = StateVariableFilter::coefficients(tuningIn, damping);
+        norm[n] = c.norm; tuningNorm[n] = c.tuningNorm; tuning[n] = c.tuning; weight[n] = weightIn;
+    }
+    // Feeds the same input to every filter and returns the sum of weight * band * damping.
+    inline double process(double input, double damping) {
+        double weightedBand[N];
+        for (int n = 0; n < N; ++n) {   // independent filters: vectorisable
+            const double inputMinusLow = input - lowIntegrator[n];
+            const double bandOut = norm[n] * bandIntegrator[n] + tuningNorm[n] * inputMinusLow;
+            const double lowOut = lowIntegrator[n] + tuning[n] * bandOut;
+            bandIntegrator[n] = 2.0 * bandOut - bandIntegrator[n];
+            lowIntegrator[n] = 2.0 * lowOut - lowIntegrator[n];
+            weightedBand[n] = weight[n] * bandOut * damping;
+        }
+        double sum = 0.0;
+        for (int n = 0; n < N; ++n) sum += weightedBand[n];   // summed in order, for repeatable rounding
+        return sum;
     }
 };
 
@@ -124,15 +168,14 @@ public:
         for (int ch = 0; ch < 2; ++ch) {
             djFilterStage1_[ch].reset();
             djFilterStage2_[ch].reset();
-            for (int n = 0; n < kNotchCount; ++n) {
-                notchStage1_[ch][n].reset();
-                peakFilters_[ch][n].reset();
-                notchStage2_[ch][n].reset();
-            }
+            notchStage1_[ch].resetAll();
+            peakFilters_[ch].resetAll();
+            notchStage2_[ch].resetAll();
         }
         sweepPhase_ = 0.0;
         coefficientCounter_ = 0;
         direction_ = targetDirection_;
+        djCachedTurn_ = -1.0;   // force the DJ filter coefficients to be recomputed
     }
 
     // color 0..1 (0.5 = off), speed 0..1, resonance 0..1.
@@ -194,6 +237,8 @@ public:
             // --- DJ filter cutoff: exponential over the turn, so each bit of turn moves it by
             // the same number of octaves (the low-pass eases out a little toward full left,
             // like Traktor's).
+            if (turn_ != djCachedTurn_ || direction_ != djCachedDirection_) {
+            djCachedTurn_ = turn_; djCachedDirection_ = direction_;
             double cutoffHz;
             if (direction_ < 0) cutoffHz = kLowPassStartHz * std::pow(kLowPassEndHz / kLowPassStartHz, std::pow(turn_, 0.7));
             else                cutoffHz = kHighPassStartHz * std::pow(kHighPassEndHz / kHighPassStartHz, turn_);
@@ -204,6 +249,9 @@ public:
             // sub-bass isn't pumped up near full turn.
             const double damping1 = 1.0 / 0.5412;
             const double damping2 = 1.0 / (1.3066 + 0.3 * std::sin(kPi * turn_));
+            djCoefficients1_ = StateVariableFilter::coefficients(cutoffTuning, damping1);
+            djCoefficients2_ = StateVariableFilter::coefficients(cutoffTuning, damping2);
+            }
 
             // --- Sweep phase, in octaves. It wraps over the whole range (kNotchCount octaves),
             // not every octave, so each notch glides continuously and only jumps when it
@@ -220,33 +268,35 @@ public:
                 const double trimDb = direction_ > 0 ? kRightTrimDb + kRightTrimCurveDb * turn_ * turn_
                                                      : kLeftTrimDb + kLeftTrimCurveDb * turn_ * turn_;
                 outputGain_ = std::pow(10.0, trimDb * sweepAmount_ / 20.0);
+                // Every filter sits on a half-octave grid: left notches on the whole octaves,
+                // left peaks and right notches half an octave up, right peaks a whole octave
+                // up. So only 2 * kNotchCount distinct frequencies are needed.
+                double slotPosition[2 * kNotchCount], slotTuning[2 * kNotchCount], slotWeight[2 * kNotchCount];
+                for (int k = 0; k < 2 * kNotchCount; ++k) {
+                    double position = (0.5 * (double)k + sweepPhase_) / sweepOctaves;   // 0..1
+                    position -= std::floor(position);
+                    double hz = kSweepLowHz * std::exp2(position * sweepOctaves);
+                    if (hz > maxFilterHz) hz = maxFilterHz;
+                    slotPosition[k] = position;
+                    slotTuning[k] = std::tan(kPi * hz * samplePeriod);
+                    slotWeight[k] = std::sin(kPi * position);   // half-sine window: 0 at both ends
+                }
                 for (int ch = 0; ch < 2; ++ch) {
-                    const double stereoOffset = ch == 0 ? 0.0 : 0.5;   // octaves
                     for (int n = 0; n < kNotchCount; ++n) {
-                        // position of this notch in the range, 0 (bottom) .. 1 (top)
-                        double position = ((double)n + sweepPhase_ + stereoOffset) / sweepOctaves;
-                        position -= std::floor(position);
-                        // A notch that just wrapped (top -> bottom or bottom -> top) is silent
+                        const int notchSlot = 2 * n + ch;
+                        const int peakSlot = (2 * n + ch + 1) % (2 * kNotchCount);
+                        // A filter that just wrapped (top -> bottom or bottom -> top) is silent
                         // (window = 0): clear its state so no stale energy follows it.
-                        if (std::fabs(position - notchLastPosition_[ch][n]) > 0.5) {
-                            notchStage1_[ch][n].reset();
-                            notchStage2_[ch][n].reset();
+                        if (std::fabs(slotPosition[notchSlot] - notchLastPosition_[ch][n]) > 0.5) {
+                            notchStage1_[ch].reset(n);
+                            notchStage2_[ch].reset(n);
                         }
-                        notchLastPosition_[ch][n] = position;
-                        double notchHz = kSweepLowHz * std::exp2(position * sweepOctaves);
-                        if (notchHz > maxFilterHz) notchHz = maxFilterHz;
-                        notchTuning_[ch][n] = std::tan(kPi * notchHz * samplePeriod);
-                        notchWeight_[ch][n] = std::sin(kPi * position);   // half-sine window: 0 at both ends
-
-                        // the peak half an octave above this notch
-                        double peakPosition = position + 0.5 / sweepOctaves;
-                        peakPosition -= std::floor(peakPosition);
-                        if (std::fabs(peakPosition - peakLastPosition_[ch][n]) > 0.5) peakFilters_[ch][n].reset();
-                        peakLastPosition_[ch][n] = peakPosition;
-                        double peakHz = kSweepLowHz * std::exp2(peakPosition * sweepOctaves);
-                        if (peakHz > maxFilterHz) peakHz = maxFilterHz;
-                        peakTuning_[ch][n] = std::tan(kPi * peakHz * samplePeriod);
-                        peakWeight_[ch][n] = std::sin(kPi * peakPosition);
+                        notchLastPosition_[ch][n] = slotPosition[notchSlot];
+                        notchStage1_[ch].setCoefficients(n, slotTuning[notchSlot], notchDamping_, slotWeight[notchSlot]);
+                        notchStage2_[ch].setCoefficients(n, slotTuning[notchSlot], notchDamping_, slotWeight[notchSlot]);
+                        if (std::fabs(slotPosition[peakSlot] - peakLastPosition_[ch][n]) > 0.5) peakFilters_[ch].reset(n);
+                        peakLastPosition_[ch][n] = slotPosition[peakSlot];
+                        peakFilters_[ch].setCoefficients(n, slotTuning[peakSlot], notchDamping_, slotWeight[peakSlot]);
                     }
                 }
             }
@@ -258,40 +308,25 @@ public:
                 const double input = (double)buffer[2 * i + ch];
 
                 // DJ filter: two stages, high-pass when turning right, low-pass when left
-                double low, band, high;
-                djFilterStage1_[ch].process(input, cutoffTuning, damping1, low, band, high);
+                double low, high;
+                djFilterStage1_[ch].process(input, djCoefficients1_, low, high);
                 const double stage1Out = direction_ < 0 ? low : high;
-                djFilterStage2_[ch].process(stage1Out, cutoffTuning, damping2, low, band, high);
+                djFilterStage2_[ch].process(stage1Out, djCoefficients2_, low, high);
                 const double filterOut = direction_ < 0 ? low : high;
                 const double filtered = input + filterMix * (filterOut - input);
 
                 // Notches: subtracting a unity-gain band-pass at a frequency carves a notch there
                 // (each weighted by its fade window). Two identical stages in series double the
                 // notch depth in dB.
-                double notchSum1 = 0.0;
-                for (int n = 0; n < kNotchCount; ++n) {
-                    double l, b, h;
-                    notchStage1_[ch][n].process(filtered, notchTuning_[ch][n], notchDamping, l, b, h);
-                    notchSum1 += notchWeight_[ch][n] * b * notchDamping;
-                }
+                const double notchSum1 = notchStage1_[ch].process(filtered, notchDamping);
                 const double afterNotches1 = filtered - sweepAmount * notchSum1;
-                double notchSum2 = 0.0;
-                for (int n = 0; n < kNotchCount; ++n) {
-                    double l, b, h;
-                    notchStage2_[ch][n].process(afterNotches1, notchTuning_[ch][n], notchDamping, l, b, h);
-                    notchSum2 += notchWeight_[ch][n] * b * notchDamping;
-                }
+                const double notchSum2 = notchStage2_[ch].process(afterNotches1, notchDamping);
                 const double afterNotches = afterNotches1 - sweepAmount * notchSum2;
 
                 // Peaks half way between the notches, like Traktor's: adding the band-passes
                 // back makes bumps that balance the dips, so the sweep is deep without
                 // scooping out the mids.
-                double peakSum = 0.0;
-                for (int n = 0; n < kNotchCount; ++n) {
-                    double l, b, h;
-                    peakFilters_[ch][n].process(afterNotches, peakTuning_[ch][n], notchDamping, l, b, h);
-                    peakSum += peakWeight_[ch][n] * b * notchDamping;
-                }
+                const double peakSum = peakFilters_[ch].process(afterNotches, notchDamping);
                 double output = (afterNotches + sweepAmount * kPeakGain * peakSum) * outputGain_;
                 // No limiter: the effect only boosts single frequencies a few dB, and VirtualDJ's
                 // float mix bus has headroom. Only guard against pathological values.
@@ -304,11 +339,9 @@ public:
         for (int ch = 0; ch < 2; ++ch) {
             djFilterStage1_[ch].flush();
             djFilterStage2_[ch].flush();
-            for (int n = 0; n < kNotchCount; ++n) {
-                notchStage1_[ch][n].flush();
-                peakFilters_[ch][n].flush();
-                notchStage2_[ch][n].flush();
-            }
+            notchStage1_[ch].flush();
+            peakFilters_[ch].flush();
+            notchStage2_[ch].flush();
         }
     }
 
@@ -334,12 +367,12 @@ private:
 
     // Filters, per channel ([2] = left, right)
     StateVariableFilter djFilterStage1_[2], djFilterStage2_[2];
-    StateVariableFilter notchStage1_[2][kNotchCount], notchStage2_[2][kNotchCount];
-    StateVariableFilter peakFilters_[2][kNotchCount];
+    BandPassBank<kNotchCount> notchStage1_[2], notchStage2_[2], peakFilters_[2];
 
-    // Notch and peak coefficients (refreshed every 8 samples)
-    double notchTuning_[2][kNotchCount] = {}, notchWeight_[2][kNotchCount] = {}, notchLastPosition_[2][kNotchCount] = {};
-    double peakTuning_[2][kNotchCount] = {}, peakWeight_[2][kNotchCount] = {}, peakLastPosition_[2][kNotchCount] = {};
+    // Notch and peak settings (refreshed every 8 samples)
+    double notchLastPosition_[2][kNotchCount] = {}, peakLastPosition_[2][kNotchCount] = {};   // for wrap detection
+    StateVariableFilter::Coefficients djCoefficients1_ = {}, djCoefficients2_ = {};
+    double djCachedTurn_ = -1.0, djCachedDirection_ = 0.0;   // inputs the DJ coefficients were made from
     double notchDamping_ = 0.5;   // 1 / notch Q
     double outputGain_ = 1.0;     // level trim, linear
     unsigned coefficientCounter_ = 0;

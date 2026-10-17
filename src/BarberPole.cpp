@@ -32,7 +32,7 @@ HRESULT VDJ_API CBarberPole::OnGetPluginInfo(TVdjPluginInfo8 *info)
     info->PluginName  = "Barber Pole";
     info->Author      = "Barber Pole project";
     info->Description = "Traktor-style Barber Pole: filter + endless rising/falling sweep. Centre = off.";
-    info->Version     = "2.4.2";
+    info->Version     = "2.4.3";
     info->Flags       = 0x00;
     info->Bitmap      = NULL;
     return S_OK;
