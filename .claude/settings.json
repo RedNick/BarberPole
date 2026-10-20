@@ -1,0 +1,23 @@
+{
+  "model": "opusplan",
+  "permissions": {
+    "deny": [
+      "Read(build/**)",
+      "Read(build32/**)",
+      "Read(**/*.wav)",
+      "Read(**/*.flac)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Bash(git push --force:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git push -f:*)",
+      "Bash(rm -rf:*)",
+      "Bash(rm -fr:*)"
+    ]
+  },
+  "env": {
+    "BASH_MAX_OUTPUT_LENGTH": "20000",
+    "MAX_MCP_OUTPUT_TOKENS": "15000",
+    "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1"
+  }
+}
