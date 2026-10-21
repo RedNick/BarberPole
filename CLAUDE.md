@@ -27,6 +27,8 @@ g++ -O2 -std=c++11 -shared -fPIC -o libbp.so capi.cpp
 python3 analyze.py        # prints PASS/FAIL per check; needs numpy
 ```
 
+`test/benchmark.cpp` measures the DSP's speed and prints a hash of its output per case: `g++ -O2 -std=c++11 -I../src -o benchmark benchmark.cpp && ./benchmark`. Run it before and after a performance change; matching hashes mean the sound didn't change (compare builds from the same compiler only).
+
 `test/host_sim.cpp` loads a built plugin through `DllGetClassObject` the way VirtualDJ does: `host_sim <path to plugin>`. Add `-DREAL_SDK` when compiling it against the real headers.
 
 ## CI and releases
@@ -55,7 +57,7 @@ To release, bump the version in all three places:
 - Knob centre ±3 % must be a bit-exact bypass, and returning to centre must end fully clean. `analyze.py` checks both.
 - Constants marked "matched to Traktor" were fitted to recordings. Don't change them without re-running the comparison test.
 - `test/capi.cpp` names and signatures are called by name from `analyze.py`. Change both together.
-- Performance changes should keep output bit-identical. v2.4.3 sped the DSP up by about a third without changing a single output sample.
+- Performance changes should keep output bit-identical. v2.4.3 sped the DSP up by about a third; across the benchmark and 30 s knob sweeps at 44.1/48/96 kHz the only difference from v2.4.2 is one sample in a 96 kHz silent decay tail, off by 2e-25.
 - Windows builds use the static MSVC runtime, so users don't need the VC++ redistributable.
 
 ## Conventions
