@@ -6,6 +6,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Publish a release with this tag (e.g. v2.5), created on the commit being built. Leave empty to only build.'
+        required: false
+        default: ''
 
 permissions:
   contents: write   # to create releases on v* tags
@@ -109,7 +114,8 @@ jobs:
           path: BarberPole-macos-universal.zip
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    # on a pushed v* tag, or when run by hand with a release_tag
+    if: startsWith(github.ref, 'refs/tags/v') || startsWith(inputs.release_tag, 'v')
     needs: [windows, macos]
     runs-on: ubuntu-latest
     steps:
@@ -121,10 +127,12 @@ jobs:
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag || github.ref_name }}
         run: |
-          gh release create "$GITHUB_REF_NAME" artifacts/*.zip \
+          gh release create "$TAG" artifacts/*.zip \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Barber Pole $GITHUB_REF_NAME" \
+            --target "$GITHUB_SHA" \
+            --title "Barber Pole $TAG" \
             --notes "Traktor-style Barber Pole Color FX for VirtualDJ.
 
           - **Windows:** unzip BarberPole-windows-x64.zip and copy BarberPole.dll to Documents\\VirtualDJ\\Plugins64\\SoundEffect\\ (close VirtualDJ first).

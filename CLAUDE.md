@@ -31,13 +31,13 @@ python3 analyze.py        # prints PASS/FAIL per check; needs numpy
 
 ## CI and releases
 
-`.github/workflows/build.yml` builds the Windows x64 and x86 DLLs and the macOS universal bundle on every push and PR. It also checks that both DLLs export an undecorated `DllGetClassObject`. Pushing a `v*` tag creates a GitHub release with the zipped builds.
+`.github/workflows/build.yml` builds the Windows x64 and x86 DLLs and the macOS universal bundle on every push and PR. It also checks that both DLLs export an undecorated `DllGetClassObject`. Pushing a `v*` tag creates a GitHub release with the zipped builds. Running the workflow by hand (workflow_dispatch) with `release_tag` set, e.g. `v2.5`, does the same and creates the tag on the commit it built; use this from cloud sessions, which can't push tags.
 
 To release, bump the version in all three places:
 
 1. `info->Version` in `src/BarberPole.cpp`
 2. The README title
-3. The tag, `vX.Y.Z`
+3. The tag, `vX.Y.Z` (pushed, or the workflow's `release_tag` input)
 
 ## Architecture
 
