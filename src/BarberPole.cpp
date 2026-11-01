@@ -32,7 +32,7 @@ HRESULT VDJ_API CBarberPole::OnGetPluginInfo(TVdjPluginInfo8 *info)
     info->PluginName  = "Barber Pole";
     info->Author      = "Barber Pole project";
     info->Description = "Traktor-style Barber Pole: filter + endless rising/falling sweep. Centre = off.";
-    info->Version     = "2.4.4";
+    info->Version     = "2.4.5";
     // Always run before the volume fader, like the built-in Color FX. Otherwise, with
     // VirtualDJ's FX processing set to post-fader, the headphones (PFL, taken before the
     // fader) get the dry signal and only the master hears the effect.
