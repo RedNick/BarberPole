@@ -10,6 +10,7 @@ typedef char *VDJ_BITMAP; typedef void *VDJ_HINSTANCE; typedef void *VDJ_WINDOW;
 #define E_NOTIMPL ((HRESULT)0x80004001)
 #define NO_ERROR 0
 #define CLASS_E_CLASSNOTAVAILABLE -1
+#define VDJFLAG_ALWAYSPREFADER 0x80
 struct GUID { unsigned long Data1; unsigned short Data2, Data3; unsigned char Data4[8]; };
 struct TVdjPluginInfo8 { const char *PluginName, *Author, *Description, *Version; VDJ_BITMAP Bitmap; DWORD Flags; };
 struct TVdjPluginInterface8 { DWORD Type; const char *Xml; void *ImageBuffer; int ImageSize; VDJ_WINDOW hWnd; };
