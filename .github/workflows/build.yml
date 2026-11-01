@@ -113,10 +113,63 @@ jobs:
           name: macos-universal
           path: BarberPole-macos-universal.zip
 
+  vst3-windows:
+    # The VST3 version for DAWs (FL Studio, Reaper, ...). Steinberg's validator runs on the
+    # plugin as part of the build and fails it if the plugin breaks the VST3 rules.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (downloads the VST3 SDK)
+        run: cmake -S vst3 -B build-vst3 -A x64
+
+      - name: Build and validate
+        run: cmake --build build-vst3 --config Release
+
+      - name: Check it sounds identical to the VirtualDJ DSP
+        run: build-vst3\bin\Release\compare_with_dsp.exe
+
+      - name: Package
+        shell: bash
+        run: 7z a -tzip BarberPole-vst3-windows-x64.zip ./build-vst3/VST3/Release/BarberPole.vst3
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vst3-windows
+          path: BarberPole-vst3-windows-x64.zip
+
+  vst3-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Configure (universal: Apple Silicon + Intel; downloads the VST3 SDK)"
+        run: cmake -S vst3 -B build-vst3 -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build and validate
+        run: cmake --build build-vst3
+
+      - name: Check it sounds identical to the VirtualDJ DSP
+        run: build-vst3/bin/Release/compare_with_dsp
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          b=build-vst3/VST3/Release/BarberPole.vst3
+          [ -d "$b" ] || { echo "::error::BarberPole.vst3 not built"; exit 1; }
+          codesign --force --deep --sign - "$b"   # ad-hoc signature so macOS will load it
+          lipo -info "$b/Contents/MacOS/BarberPole"
+          ditto -c -k --keepParent "$b" BarberPole-vst3-macos-universal.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vst3-macos-universal
+          path: BarberPole-vst3-macos-universal.zip
+
   release:
     # on a pushed v* tag, or when run by hand with a release_tag
     if: startsWith(github.ref, 'refs/tags/v') || startsWith(inputs.release_tag, 'v')
-    needs: [windows, macos]
+    needs: [windows, macos, vst3-windows, vst3-macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -133,9 +186,11 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "Barber Pole $TAG" \
-            --notes "Traktor-style Barber Pole Color FX for VirtualDJ.
+            --notes "Traktor-style Barber Pole Color FX for VirtualDJ, also as a VST3 plugin for DAWs.
 
           - **Windows:** unzip BarberPole-windows-x64.zip and copy BarberPole.dll to Documents\\VirtualDJ\\Plugins64\\SoundEffect\\ (close VirtualDJ first).
           - **Windows, 32-bit VirtualDJ only:** use BarberPole-windows-x86.zip instead, and copy BarberPole.dll to Documents\\VirtualDJ\\Plugins\\SoundEffect\\.
           - **Mac:** unzip BarberPole-macos-universal.zip and copy BarberPole.bundle to Documents/VirtualDJ/PluginsArm/SoundEffect/ (Apple Silicon) or Documents/VirtualDJ/Plugins64/SoundEffect/ (Intel).
+          - **VST3, Windows (FL Studio, Reaper, ...):** unzip BarberPole-vst3-windows-x64.zip and copy the whole BarberPole.vst3 folder to C:\\Program Files\\Common Files\\VST3\\, then rescan plugins in your DAW.
+          - **VST3, Mac:** unzip BarberPole-vst3-macos-universal.zip and copy BarberPole.vst3 to ~/Library/Audio/Plug-Ins/VST3/.
           - BarberPole-tools-windows-x64.zip has knob_sequencer.exe and compare_recordings.exe for the Traktor comparison test (see the README)."

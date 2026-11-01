@@ -33,13 +33,14 @@ python3 analyze.py        # prints PASS/FAIL per check; needs numpy
 
 ## CI and releases
 
-`.github/workflows/build.yml` builds the Windows x64 and x86 DLLs and the macOS universal bundle on every push and PR. It also checks that both DLLs export an undecorated `DllGetClassObject`. Pushing a `v*` tag creates a GitHub release with the zipped builds. Running the workflow by hand (workflow_dispatch) with `release_tag` set, e.g. `v2.5`, does the same and creates the tag on the commit it built; use this from cloud sessions, which can't push tags.
+`.github/workflows/build.yml` builds the Windows x64 and x86 DLLs and the macOS universal bundle on every push and PR. It also builds the VST3 plugin for Windows x64 and macOS (universal), runs Steinberg's validator and `compare_with_dsp` on it, and checks that both DLLs export an undecorated `DllGetClassObject`. Pushing a `v*` tag creates a GitHub release with the zipped builds. Running the workflow by hand (workflow_dispatch) with `release_tag` set, e.g. `v2.5`, does the same and creates the tag on the commit it built; use this from cloud sessions, which can't push tags.
 
 To release, bump the version in all three places:
 
 1. `info->Version` in `src/BarberPole.cpp`
-2. The README title
-3. The tag, `vX.Y.Z` (pushed, or the workflow's `release_tag` input)
+2. `project(... VERSION)` in `vst3/CMakeLists.txt`
+3. The README title
+4. The tag, `vX.Y.Z` (pushed, or the workflow's `release_tag` input)
 
 ## Architecture
 
@@ -48,6 +49,7 @@ To release, bump the version in all three places:
   - A `BandPassBank` of 8 octave-spaced notches in two stages, with resonant peaks between them, faded in and out at the range ends (the Shepard/Risset illusion).
   - A `DenormalGuard` for x86.
 - `src/BarberPole.h/.cpp` is a thin `IVdjPluginDsp8` wrapper (`CBarberPole`). It declares the parameters, including the Colour knob through `DeclareParameterColorFX`, maps the track's BPM to beats per second, and forwards audio to the DSP.
+- `vst3/` is the VST3 wrapper, a separate CMake project (`cmake -S vst3 -B build-vst3`) that downloads the Steinberg VST3 SDK (MIT) itself and needs no VirtualDJ SDK. `BarberPoleProcessor` copies the host's separate channel buffers into an interleaved buffer for the same DSP; `BarberPoleController` declares the parameters and their display text; `BarberPoleIds.h` holds the parameter IDs and class IDs, which must never change once released. `vst3/test/compare_with_dsp.cpp` checks the output is bit-identical to the DSP core.
 - `src/BarberPole.def` exports `DllGetClassObject` undecorated. 32-bit `__stdcall` builds need this, or VirtualDJ can't load the DLL.
 - `tools/` holds Windows-only helpers for comparing against Traktor: `knob_sequencer` (MIDI knob playback through loopMIDI) and `compare_recordings`. The README describes the workflow.
 

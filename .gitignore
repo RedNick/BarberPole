@@ -1,6 +1,7 @@
 # build output and IDE state
 build/
 build32/
+build-vst3/
 .vs/
 **/.vs/
 
