@@ -35,7 +35,7 @@ python3 analyze.py        # prints PASS/FAIL per check; needs numpy
 
 `.github/workflows/build.yml` builds the Windows x64 and x86 DLLs and the macOS universal bundle on every push and PR. It also builds the VST3 plugin for Windows x64 and macOS (universal), runs Steinberg's validator and `compare_with_dsp` on it, and checks that both DLLs export an undecorated `DllGetClassObject`. Pushing a `v*` tag creates a GitHub release with the zipped builds. Running the workflow by hand (workflow_dispatch) with `release_tag` set, e.g. `v2.5`, does the same and creates the tag on the commit it built; use this from cloud sessions, which can't push tags.
 
-To release, bump the version in all three places:
+To release, bump the version in all four places:
 
 1. `info->Version` in `src/BarberPole.cpp`
 2. `project(... VERSION)` in `vst3/CMakeLists.txt`

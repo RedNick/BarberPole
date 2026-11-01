@@ -16,7 +16,7 @@ if(NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
 endif()
 
 # Keep the version in step with src/BarberPole.cpp (see "CI and releases" in CLAUDE.md)
-project(BarberPoleVST3 VERSION 2.4.3 LANGUAGES C CXX)
+project(BarberPoleVST3 VERSION 2.4.4 LANGUAGES C CXX)
 
 # --- The VST3 SDK -----------------------------------------------------------------------------
 set(VST3_SDK_DIR "" CACHE PATH "An existing vst3sdk checkout (leave empty to download it)")
