@@ -64,6 +64,22 @@ filter_selectcolorfx "Barber Pole"
 
 After that, the Filter/Colour knob drives it. Don't also add the built-in filter on top: this effect *is* the filter.
 
+## 5. VST3 version (FL Studio, Reaper and other DAWs)
+
+The same effect is also built as a VST3 plugin, from the same DSP code, so it sounds exactly like the VirtualDJ version. It has the same three controls (Colour, Speed, Resonance), all automatable, shown in your DAW's own plugin panel. The sweep follows the project tempo (120 BPM if the DAW doesn't send one). It's stereo only.
+
+**Install:** from the [Releases page](https://github.com/RedNick/BarberPole/releases), unzip `BarberPole-vst3-windows-x64.zip` and copy the whole `BarberPole.vst3` folder to `C:\Program Files\Common Files\VST3\` (on a Mac, `BarberPole-vst3-macos-universal.zip` goes to `~/Library/Audio/Plug-Ins/VST3/`). Then rescan: in FL Studio, *Options → Manage plugins → Find more plugins*; in Reaper, *Options → Preferences → Plug-ins → VST → Re-scan*.
+
+**Build it yourself:** it doesn't need the VirtualDJ SDK. CMake downloads Steinberg's VST3 SDK (MIT licence) by itself:
+
+```
+cmake -S vst3 -B build-vst3 -A x64          # leave out -A x64 on macOS/Linux
+cmake --build build-vst3 --config Release   # -> build-vst3\VST3\Release\BarberPole.vst3
+build-vst3\bin\Release\compare_with_dsp     # checks the output matches the DSP core exactly
+```
+
+Steinberg's validator runs on the plugin after every build. On Linux, the SDK's hosting tools also need the GTK 3 and gtkmm 3 development packages.
+
 ## Comparing with Traktor: automated knob test
 
 `tools/knob_sequencer.cpp` plays the same timed knob sequence into both programs over MIDI, so the two recordings line up exactly. Record the same test file in each program, then compare the recordings.
@@ -113,6 +129,7 @@ Options: `--port <name|number>`, `--channel 1-16`, `--cc 0-127` (default 20), `-
 
 - `src/barberpole_dsp.h`: the DSP core, plain C++ with no SDK dependency
 - `src/BarberPole.h/.cpp`: the VirtualDJ wrapper (`IVdjPluginDsp8`)
+- `vst3/`: the VST3 wrapper (processor, controller, factory) and its own CMake project; `vst3/test/compare_with_dsp.cpp` checks it matches the DSP core bit for bit
 - `test/analyze.py` + `test/capi.cpp`: tests for exact bypass and dead zone, filter direction and strength, sweep direction and tempo sync, loudness, no harsh boosts, no clicks when crossing centre, and stability at 44.1/48/96 kHz
 - `test/host_sim.cpp`: loads the built plugin through `DllGetClassObject` like a host would
 - `tools/knob_sequencer.cpp`: MIDI knob sequencer for the Traktor comparison (Windows)
@@ -124,7 +141,7 @@ Options: `--port <name|number>`, `--channel 1-16`, `--cc 0-127` (default 20), `-
 
 ## License and trademarks
 
-The code is released under the MIT License (see `LICENSE`). The VirtualDJ SDK headers it builds against are not included and are covered by VirtualDJ's own terms.
+The code is released under the MIT License (see `LICENSE`). The VirtualDJ SDK headers it builds against are not included and are covered by VirtualDJ's own terms. The VST3 version is built with Steinberg's VST3 SDK, which is MIT-licensed and downloaded at build time. VST is a trademark of Steinberg Media Technologies GmbH.
 
 This is an independent project. It isn't affiliated with, endorsed by or connected to Native Instruments or Atomix Productions. Traktor is a trademark of Native Instruments, and VirtualDJ is a trademark of Atomix Productions; they're mentioned only to describe what the effect is like and what it runs in.
 
