@@ -93,3 +93,7 @@ target_compile_definitions(compare_with_dsp PRIVATE BARBERPOLE_VST3_VERSION="${P
 if(MSVC)
   target_compile_definitions(compare_with_dsp PRIVATE NOMINMAX _CRT_SECURE_NO_WARNINGS)
 endif()
+if(APPLE)
+  # the SDK's string and UID code uses CoreFoundation on macOS
+  target_link_libraries(compare_with_dsp PRIVATE "-framework CoreFoundation")
+endif()
