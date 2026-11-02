@@ -6,6 +6,7 @@
 // Further from centre = stronger filter.
 // Speed       : sweep rate, synced to the track tempo (beats per octave)
 // Resonance   : notch sharpness (soft/wide -> vocal/narrow)
+// Strength    : 0 % = the Traktor-matched sound; higher = deeper sweep and stronger filter
 //
 // This file only translates between VirtualDJ's plugin API and the DSP class: parameters,
 // their on-screen text, tempo, and start/stop.
@@ -24,6 +25,7 @@ HRESULT VDJ_API CBarberPole::OnLoad()
     DeclareParameterColorFX(&m_Color,    ID_COLOR,     "Color",     "CLR");
     DeclareParameterSlider(&m_Speed,     ID_SPEED,     "Speed",     "SPD",  0.5f);
     DeclareParameterSlider(&m_Resonance, ID_RESONANCE, "Resonance", "RES",  0.4f);
+    DeclareParameterSlider(&m_Strength,  ID_STRENGTH,  "Strength",  "STR",  0.5f);
     return S_OK;
 }
 
@@ -32,7 +34,7 @@ HRESULT VDJ_API CBarberPole::OnGetPluginInfo(TVdjPluginInfo8 *info)
     info->PluginName  = "Barber Pole";
     info->Author      = "Barber Pole project";
     info->Description = "Traktor-style Barber Pole: filter + endless rising/falling sweep. Centre = off.";
-    info->Version     = "2.4.5";
+    info->Version     = "2.5.0";
     // Always run before the volume fader, like the built-in Color FX. Otherwise, with
     // VirtualDJ's FX processing set to post-fader, the headphones (PFL, taken before the
     // fader) get the dry signal and only the master hears the effect.
@@ -82,12 +84,17 @@ HRESULT VDJ_API CBarberPole::OnGetParameterString(int id, char *out, int outSize
     case ID_RESONANCE:
         snprintf(out, outSize, "%.0f%%", m_Resonance * 100.0f);
         return S_OK;
+    case ID_STRENGTH:
+        if (m_Strength <= 0.0f) snprintf(out, outSize, "0%% (Traktor)");
+        else snprintf(out, outSize, "%.0f%%", m_Strength * 100.0f);
+        return S_OK;
     }
     return E_NOTIMPL;
 }
 
 HRESULT VDJ_API CBarberPole::OnStart()
 {
+    m_Effect.setStrength(m_Strength);   // start at the slider's value rather than ramping to it
     if (SampleRate != m_PreparedSampleRate) {
         m_Effect.prepare(SampleRate);
         m_PreparedSampleRate = SampleRate;
@@ -104,6 +111,7 @@ HRESULT VDJ_API CBarberPole::OnStop()
 
 HRESULT VDJ_API CBarberPole::OnProcessSamples(float *buffer, int frameCount)
 {
+    m_Effect.setStrength(m_Strength);
     if (SampleRate != m_PreparedSampleRate) {   // the engine's sample rate changed while running
         m_Effect.prepare(SampleRate);
         m_PreparedSampleRate = SampleRate;

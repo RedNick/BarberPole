@@ -13,12 +13,14 @@ enum ParameterId : Steinberg::Vst::ParamID {
     kColourId    = 0,   // the main knob: 0.5 = centre = off
     kSpeedId     = 1,   // sweep speed
     kResonanceId = 2,   // notch sharpness
+    kStrengthId  = 3,   // 0 = Traktor-matched sound, higher = stronger
 };
 
 // Defaults, the same as the VirtualDJ plugin (src/BarberPole.cpp).
 constexpr double kDefaultColour    = 0.5;
 constexpr double kDefaultSpeed     = 0.5;
 constexpr double kDefaultResonance = 0.4;
+constexpr double kDefaultStrength  = 0.5;
 
 // Class IDs. Hosts identify the plugin by these; never change them once released.
 static const Steinberg::FUID kProcessorUID (0x0667FD1C, 0x13AF4B0F, 0x807CC67A, 0x170EE717);

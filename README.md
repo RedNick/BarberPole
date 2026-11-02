@@ -1,4 +1,4 @@
-# Barber Pole: Traktor-style Mixer/Colour FX for VirtualDJ (v2.4.5)
+# Barber Pole: Traktor-style Mixer/Colour FX for VirtualDJ (v2.5.0)
 
 This is a "dual-pole" filter effect, like Traktor's Barber Pole Mixer FX. This was 100% coded by Claude.
 

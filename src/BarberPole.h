@@ -24,12 +24,13 @@ public:
 private:
     // Parameter IDs. VirtualDJ stores settings and controller mappings by these numbers,
     // so they must never change.
-    enum { ID_COLOR = 0, ID_SPEED, ID_RESONANCE };
+    enum { ID_COLOR = 0, ID_SPEED, ID_RESONANCE, ID_STRENGTH };
 
     // Parameter values, written by VirtualDJ (all 0..1).
     float m_Color = 0.5f;       // Color FX knob: 0.5 = 12 o'clock = off
     float m_Speed = 0.5f;       // sweep speed: 0..1 -> 4x slower .. 4x faster than default
     float m_Resonance = 0.4f;   // notch sharpness
+    float m_Strength = 0.5f;    // 0 = Traktor-matched sound, higher = stronger
 
     double beatsPerSecond() const;   // track tempo, or 0 if unknown
 

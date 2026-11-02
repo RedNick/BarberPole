@@ -44,7 +44,7 @@ To release, bump the version in all four places:
 
 ## Architecture
 
-- `src/barberpole_dsp.h` is the whole DSP: header-only, namespace `barberpole`, with no SDK dependency. `BarberPole::prepare(sampleRate)`, `setParams(color, speed, resonance, beatsPerSecond)` and `process(interleavedStereo, frames)` are the interface. Inside it:
+- `src/barberpole_dsp.h` is the whole DSP: header-only, namespace `barberpole`, with no SDK dependency. `BarberPole::prepare(sampleRate)`, `setParams(color, speed, resonance, beatsPerSecond)`, `setStrength(strength)` and `process(interleavedStereo, frames)` are the interface. Inside it:
   - A 4th-order state-variable DJ filter.
   - A `BandPassBank` of 8 octave-spaced notches in two stages, with resonant peaks between them, faded in and out at the range ends (the Shepard/Risset illusion).
   - A `DenormalGuard` for x86.
@@ -58,6 +58,7 @@ To release, bump the version in all four places:
 - The parameter IDs (`ID_COLOR`, `ID_SPEED`, `ID_RESONANCE`) must never change: VirtualDJ stores settings and controller mappings by them.
 - Knob centre ±3 % must be a bit-exact bypass, and returning to centre must end fully clean. `analyze.py` checks both.
 - Constants marked "matched to Traktor" were fitted to recordings. Don't change them without re-running the comparison test.
+- Strength 0 must stay bit-identical to the Traktor-matched sound (`test/benchmark.cpp` hashes run at strength 0, the DSP's default). The plugins default the Strength slider to 50 %; VST3 states saved before the slider existed load at 0 %.
 - `test/capi.cpp` names and signatures are called by name from `analyze.py`. Change both together.
 - Performance changes should keep output bit-identical. v2.4.3 sped the DSP up by about a third; across the benchmark and 30 s knob sweeps at 44.1/48/96 kHz the only difference from v2.4.2 is one sample in a 96 kHz silent decay tail, off by 2e-25.
 - Windows builds use the static MSVC runtime, so users don't need the VC++ redistributable.
