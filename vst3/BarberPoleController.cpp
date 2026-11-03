@@ -137,6 +137,30 @@ public:
     }
 };
 
+// Strength slider: shown as a percentage, with 0 % marked as the Traktor-matched sound.
+class StrengthParameter : public Parameter {
+public:
+    StrengthParameter()
+    : Parameter(STR16("Strength"), kStrengthId, nullptr, kDefaultStrength, 0, ParameterInfo::kCanAutomate) {}
+
+    void toString(ParamValue normalized, String128 out) const override {
+        char text[24];
+        if (normalized <= 0.0) std::snprintf(text, sizeof(text), "0%% (Traktor)");
+        else std::snprintf(text, sizeof(text), "%.0f%%", normalized * 100.0);
+        setDisplayText(out, text);
+    }
+
+    // Reads back a percentage, e.g. "50%" or "50".
+    bool fromString(const TChar* typed, ParamValue& normalized) const override {
+        char text[64];
+        getTypedText(typed, text, sizeof(text));
+        double percent = 0.0;
+        if (!findNumber(text, percent)) return false;
+        normalized = clamp01(percent / 100.0);
+        return true;
+    }
+};
+
 } // namespace
 
 tresult PLUGIN_API BarberPoleController::initialize(FUnknown* context)
@@ -148,6 +172,7 @@ tresult PLUGIN_API BarberPoleController::initialize(FUnknown* context)
     parameters.addParameter(new ColourParameter);
     parameters.addParameter(new SpeedParameter);
     parameters.addParameter(new ResonanceParameter);
+    parameters.addParameter(new StrengthParameter);
     return kResultOk;
 }
 
@@ -158,6 +183,7 @@ tresult PLUGIN_API BarberPoleController::setComponentState(IBStream* state)
     setParamNormalized(kColourId, saved.colour);
     setParamNormalized(kSpeedId, saved.speed);
     setParamNormalized(kResonanceId, saved.resonance);
+    setParamNormalized(kStrengthId, saved.strength);
     return kResultOk;
 }
 

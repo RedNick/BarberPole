@@ -47,6 +47,7 @@ private:
     float colour_    = (float)kDefaultColour;
     float speed_     = (float)kDefaultSpeed;
     float resonance_ = (float)kDefaultResonance;
+    float strength_  = (float)kDefaultStrength;
 
     barberpole::BarberPole effect_;
     int preparedSampleRate_ = 0;   // sample rate effect_ was last prepared for

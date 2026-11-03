@@ -64,6 +64,7 @@ tresult PLUGIN_API BarberPoleProcessor::setActive(TBool state)
         // Same as VirtualDJ's OnStart: a new sample rate re-prepares the DSP,
         // otherwise the filters and sweep position are just cleared.
         const int sampleRate = (int)processSetup.sampleRate;
+        effect_.setStrength(strength_);   // start at the slider's value rather than ramping to it
         if (sampleRate != preparedSampleRate_) {
             effect_.prepare(sampleRate);
             preparedSampleRate_ = sampleRate;
@@ -95,6 +96,7 @@ void BarberPoleProcessor::readParameterChanges(IParameterChanges* changes)
         case kColourId:    colour_    = (float)value; break;
         case kSpeedId:     speed_     = (float)value; break;
         case kResonanceId: resonance_ = (float)value; break;
+        case kStrengthId:  strength_  = (float)value; break;
         default: break;
         }
     }
@@ -143,6 +145,8 @@ tresult PLUGIN_API BarberPoleProcessor::process(ProcessData& data)
     AudioBusBuffers& output = data.outputs[0];
     if (input.numChannels < 2 || output.numChannels < 2) return kResultOk;
 
+    effect_.setStrength(strength_);
+
     // The host's sample rate changed without a setActive() call
     if ((int)processSetup.sampleRate != preparedSampleRate_) {
         preparedSampleRate_ = (int)processSetup.sampleRate;
@@ -167,6 +171,7 @@ tresult PLUGIN_API BarberPoleProcessor::setState(IBStream* state)
     colour_ = saved.colour;
     speed_ = saved.speed;
     resonance_ = saved.resonance;
+    strength_ = saved.strength;
     return kResultOk;
 }
 
@@ -176,6 +181,7 @@ tresult PLUGIN_API BarberPoleProcessor::getState(IBStream* state)
     saved.colour = colour_;
     saved.speed = speed_;
     saved.resonance = resonance_;
+    saved.strength = strength_;
     return saved.write(state) ? kResultOk : kResultFalse;
 }
 

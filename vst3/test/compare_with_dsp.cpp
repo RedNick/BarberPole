@@ -60,6 +60,7 @@ void runReference(const std::vector<float>& left, const std::vector<float>& righ
                   std::vector<float>& outLeft, std::vector<float>& outRight)
 {
     barberpole::BarberPole effect;
+    effect.setStrength((float)kDefaultStrength);
     effect.prepare(kSampleRate);
     std::vector<float> interleaved(kBlockFrames * 2);
     for (int block = 0; block < kBlockCount; ++block) {
@@ -155,6 +156,7 @@ void checkStateRoundTrip()
     changes.addParameterData(kColourId, queueIndex)->addPoint(0, 0.8, pointIndex);
     changes.addParameterData(kSpeedId, queueIndex)->addPoint(0, 0.3, pointIndex);
     changes.addParameterData(kResonanceId, queueIndex)->addPoint(0, 0.7, pointIndex);
+    changes.addParameterData(kStrengthId, queueIndex)->addPoint(0, 0.9, pointIndex);
     ProcessData data;
     data.inputParameterChanges = &changes;   // no audio: parameters only
     saver->process(data);

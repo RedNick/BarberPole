@@ -149,6 +149,14 @@ public:
     static constexpr double kRightTrimDb = -0.3, kRightTrimCurveDb = -0.5;
     static constexpr double kLeftTrimDb  = -0.2, kLeftTrimCurveDb  = -0.5;
 
+    // --- Strength (setStrength): 0 = the Traktor-matched sound above, exactly. Higher values
+    // push every part of the effect further; these are the amounts added at strength 1.
+    static constexpr double kStrengthFilterOctaves = 1.0;   // full-turn cutoff moves 1 octave further in
+    static constexpr double kStrengthFilterBump    = 1.2;   // extra resonance at the cutoff, mid-travel
+    static constexpr double kStrengthPeakGain      = 1.0;   // resonant peaks up to (1 + 1) * kPeakGain
+    static constexpr double kStrengthNotchWidth    = 0.6;   // notches up to 1.6x wider
+    static constexpr double kStrengthTrimDb        = -1.5;  // extra level trim at full effect
+
     BarberPole() { prepare(44100); }
 
     // Call before processing and whenever the sample rate changes. Clears all filter state.
@@ -163,6 +171,10 @@ public:
         turn_ = turnTarget_;
     }
 
+    // 0..1: how far past the Traktor-matched sound the effect goes (0 = Traktor). Smoothed
+    // inside process(); prepare() and reset() jump straight to it.
+    void setStrength(float strength) { strengthTarget_ = clamp01(strength); }
+
     // Clears filter state and the sweep position (e.g. when the deck starts playing).
     void reset() {
         for (int ch = 0; ch < 2; ++ch) {
@@ -176,6 +188,7 @@ public:
         coefficientCounter_ = 0;
         direction_ = targetDirection_;
         djCachedTurn_ = -1.0;   // force the DJ filter coefficients to be recomputed
+        strength_ = strengthTarget_;
     }
 
     // color 0..1 (0.5 = off), speed 0..1, resonance 0..1.
@@ -233,22 +246,28 @@ public:
             filterMix_   += ((fadingOut ? 0.0 : filterMixTarget_)   - filterMix_)   * smoothing_;
             turn_        += ((fadingOut ? 0.0 : turnTarget_)        - turn_)        * smoothing_;
             sweepRate_ += (sweepRateTarget_ - sweepRate_) * smoothing_;
+            strength_ += (strengthTarget_ - strength_) * smoothing_;
 
             // --- DJ filter cutoff: exponential over the turn, so each bit of turn moves it by
             // the same number of octaves (the low-pass eases out a little toward full left,
             // like Traktor's).
-            if (turn_ != djCachedTurn_ || direction_ != djCachedDirection_) {
-            djCachedTurn_ = turn_; djCachedDirection_ = direction_;
+            if (turn_ != djCachedTurn_ || direction_ != djCachedDirection_ || strength_ != djCachedStrength_) {
+            djCachedTurn_ = turn_; djCachedDirection_ = direction_; djCachedStrength_ = strength_;
             double cutoffHz;
-            if (direction_ < 0) cutoffHz = kLowPassStartHz * std::pow(kLowPassEndHz / kLowPassStartHz, std::pow(turn_, 0.7));
-            else                cutoffHz = kHighPassStartHz * std::pow(kHighPassEndHz / kHighPassStartHz, turn_);
+            if (direction_ < 0) {
+                const double endHz = kLowPassEndHz * std::exp2(-kStrengthFilterOctaves * strength_);
+                cutoffHz = kLowPassStartHz * std::pow(endHz / kLowPassStartHz, std::pow(turn_, 0.7));
+            } else {
+                const double endHz = kHighPassEndHz * std::exp2(kStrengthFilterOctaves * strength_);
+                cutoffHz = kHighPassStartHz * std::pow(endHz / kHighPassStartHz, turn_);
+            }
             if (cutoffHz > maxFilterHz) cutoffHz = maxFilterHz;
             const double cutoffTuning = std::tan(kPi * cutoffHz * samplePeriod);
             // Two 2nd-order stages make a 4th-order Butterworth (Q 0.54 and 1.31). The second
             // stage gets a small resonant bump mid-travel that tapers off toward the ends, so
             // sub-bass isn't pumped up near full turn.
             const double damping1 = 1.0 / 0.5412;
-            const double damping2 = 1.0 / (1.3066 + 0.3 * std::sin(kPi * turn_));
+            const double damping2 = 1.0 / (1.3066 + (0.3 + kStrengthFilterBump * strength_) * std::sin(kPi * turn_));
             djCoefficients1_ = StateVariableFilter::coefficients(cutoffTuning, damping1);
             djCoefficients2_ = StateVariableFilter::coefficients(cutoffTuning, damping2);
             }
@@ -263,10 +282,12 @@ public:
             // in that time). The right channel is offset by half an octave for a little stereo
             // movement.
             if ((coefficientCounter_++ & 7) == 0) {
-                const double notchQ = 1.5 + 4.0 * (double)resonance_;   // higher = narrower, more vocal
+                const double notchQ = (1.5 + 4.0 * (double)resonance_)   // higher = narrower, more vocal
+                                      / (1.0 + kStrengthNotchWidth * strength_);
                 notchDamping_ = 1.0 / notchQ;
-                const double trimDb = direction_ > 0 ? kRightTrimDb + kRightTrimCurveDb * turn_ * turn_
-                                                     : kLeftTrimDb + kLeftTrimCurveDb * turn_ * turn_;
+                const double trimDb = (direction_ > 0 ? kRightTrimDb + kRightTrimCurveDb * turn_ * turn_
+                                                      : kLeftTrimDb + kLeftTrimCurveDb * turn_ * turn_)
+                                      + kStrengthTrimDb * strength_;
                 outputGain_ = std::pow(10.0, trimDb * sweepAmount_ / 20.0);
                 // Every filter sits on a half-octave grid: left notches on the whole octaves,
                 // left peaks and right notches half an octave up, right peaks a whole octave
@@ -304,6 +325,7 @@ public:
 
             const double sweepAmount = sweepAmount_;
             const double filterMix = filterMix_;
+            const double peakGain = kPeakGain * (1.0 + kStrengthPeakGain * strength_);
             for (int ch = 0; ch < 2; ++ch) {
                 const double input = (double)buffer[2 * i + ch];
 
@@ -327,7 +349,7 @@ public:
                 // back makes bumps that balance the dips, so the sweep is deep without
                 // scooping out the mids.
                 const double peakSum = peakFilters_[ch].process(afterNotches, notchDamping);
-                double output = (afterNotches + sweepAmount * kPeakGain * peakSum) * outputGain_;
+                double output = (afterNotches + sweepAmount * peakGain * peakSum) * outputGain_;
                 // No limiter: the effect only boosts single frequencies a few dB, and VirtualDJ's
                 // float mix bus has headroom. Only guard against pathological values.
                 if (!(std::fabs(output) < 8.0)) output = 0.0;
@@ -372,7 +394,7 @@ private:
     // Notch and peak settings (refreshed every 8 samples)
     double notchLastPosition_[2][kNotchCount] = {}, peakLastPosition_[2][kNotchCount] = {};   // for wrap detection
     StateVariableFilter::Coefficients djCoefficients1_ = {}, djCoefficients2_ = {};
-    double djCachedTurn_ = -1.0, djCachedDirection_ = 0.0;   // inputs the DJ coefficients were made from
+    double djCachedTurn_ = -1.0, djCachedDirection_ = 0.0, djCachedStrength_ = 0.0;   // inputs the DJ coefficients were made from
     double notchDamping_ = 0.5;   // 1 / notch Q
     double outputGain_ = 1.0;     // level trim, linear
     unsigned coefficientCounter_ = 0;
@@ -388,6 +410,7 @@ private:
     double turnTarget_ = 0.0, turn_ = 0.0;                 // knob turn past the dead zone, 0..1
     double sweepRateTarget_ = 0.5, sweepRate_ = 0.5;       // octaves per second
     float speed_ = 0.5f, resonance_ = 0.4f;
+    double strengthTarget_ = 0.0, strength_ = 0.0;   // 0 = Traktor-matched, 1 = strongest
 };
 
 }  // namespace barberpole
